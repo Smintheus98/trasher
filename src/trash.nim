@@ -1,9 +1,18 @@
-import std / [os, times, parseopt]
+import std / [os, times, sequtils, parseopt]
 
-type Path = string
+type
+  Path = string
 
 
-proc tryCreateTrashBin(trashbin: Path = getHomeDir()/".trashbin"): bool {.inline, discardable.} =
+proc exists(path: Path): bool =
+  return path.fileExists() or path.dirExists()
+
+
+proc allExist(paths: seq[Path]): bool =
+  return paths.map(exists).allIt(it == true)
+
+
+proc tryCreateTrashBin(trashbin: Path = getHomeDir()/".trashbin"): bool {.discardable.} =
   ## Tries to create `trashbin` if it doesn't already exist.
   ## The return value is false if the dircetory already exists but is discarded by default.
   if not trashbin.dirExists:
@@ -44,7 +53,16 @@ proc trashDirOrFile(source, trashbin: Path) =
 
 proc parseOptions(): tuple[options: seq[string], paths: seq[Path]] =
   # TODO: parse options
-  discard
+  var parser = initOptParser()
+  for argkind, argkey, argval in parser.getopt():
+    case argkind:
+      of cmdShortOption, cmdLongOption:
+        result.options.add argkey
+      of cmdArgument:
+        result.paths.add argkey
+      of cmdEnd:
+        return
+
 
 
 proc main() =
@@ -57,6 +75,9 @@ proc main() =
       of "-h", "--help":
         # TODO: print usage
         quit QuitSuccess
+
+  if not paths.allExist:
+    quit QuitFailure
 
   trashbin.tryCreateTrashBin()
 
